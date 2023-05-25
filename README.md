@@ -1,5 +1,5 @@
-# MDPS_IM
-Robust Reward Placement in MDPS
+# MDPs_IM
+Robust Reward Placement in MDPs
 
 ### Make graphs
 - python3 make_graphs.py
