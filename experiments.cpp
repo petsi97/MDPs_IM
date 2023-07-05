@@ -12,9 +12,10 @@ namespace fs = std::filesystem;
 void init_results(string foldername){
     fs::create_directories(foldername);
     vector<string> filenames = {foldername+"/saturate.txt", 
-                                //foldername+"/singleGreedy.txt", 
                                 foldername+"/allGreedy.txt", 
-                                foldername+"/myopic.txt"}; 
+                                foldername+"/myopic.txt",
+                                foldername+"/dynamic.txt",
+                                foldername+"/bws.txt"}; 
     for(auto filename: filenames){
         ofstream foutput; 
         foutput.open (filename,ios::app); 
@@ -60,9 +61,9 @@ vector<MC> make_im(string read_folder, string name, int P, int step, bool unifor
 
 void experiment1(string foldername, vector<int> Ns, vector<int> Ps, vector<int> Steps, vector<double> budgets,
                  vector<double> alphas, bool use_IC, bool uniform_steps, string read_folder, string name_end, 
-                 bool inres){ 
+                 bool inres, bool use_pagerank_scores){ 
     std::chrono::steady_clock::time_point begin, end;
-    IM *im;
+    IM *im, *im2;
     vector<MC> mcs;
     pair<vector<int>, double> sol;
     if(inres) init_results(foldername);
@@ -86,7 +87,18 @@ void experiment1(string foldername, vector<int> Ns, vector<int> Ps, vector<int> 
                     cout<<read_folder+"/"+to_string(N)+name_end+"/costs_"+to_string(N)+name_end+".txt"<<endl;
                     mdp.read_costs(read_folder+"/"+to_string(N)+name_end+"/costs_"+to_string(N)+name_end+".txt");
                     begin = std::chrono::steady_clock::now();
-                    if(use_IC) im = new IM_IC(&mdp);
+                    if(use_IC){
+                        im = new IM_IC(&mdp);
+                        if(use_pagerank_scores){
+                            vector<string> pagerank_filenames;
+                            for(int i = 0; i<P; i++){
+                                string toname =read_folder+"/"+to_string(N)+name_end+"/"+to_string(N)+name_end+"-"+to_string(i)+"_pagerank.txt";
+                                pagerank_filenames.push_back(toname);
+                                //cout<<toname<<endl;
+                            }
+                            im2 = new IM_IC(&mdp, &pagerank_filenames);
+                        }
+                    }
                     else im = new IM_HT(&mdp);
                     end = std::chrono::steady_clock::now();
                     pretime =  std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count(); 
@@ -98,9 +110,18 @@ void experiment1(string foldername, vector<int> Ns, vector<int> Ps, vector<int> 
                         res[3] = b;
                         cout<<"Budget is "<<budget<<endl;
                         cout<<"-----------------"<<endl;
-                        begin = std::chrono::steady_clock::now();
-                        sol = Saturate(im, budget, alpha);
-                        end = std::chrono::steady_clock::now();
+                        if(!use_pagerank_scores){
+                            begin = std::chrono::steady_clock::now();
+                            sol = Saturate(im, budget, alpha);
+                            end = std::chrono::steady_clock::now();
+                        }
+                        else{
+                            begin = std::chrono::steady_clock::now();
+                            sol = Saturate(im2, budget, alpha);
+                            end = std::chrono::steady_clock::now();
+                            im->setRewards(sol.first);
+                            sol.second = findMinMaxScore(im, budget);
+                        }
                         diftime = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
                         //cout<<"Saturate | solution: ";printSolution(sol.first);
                         cout<<"Saturate | score: "<<sol.second<<endl; res[5] = sol.second;
@@ -111,9 +132,18 @@ void experiment1(string foldername, vector<int> Ns, vector<int> Ps, vector<int> 
                         cout<<"-----------------"<<endl;
 
                         cout<<"-----------------"<<endl;
-                        begin = std::chrono::steady_clock::now();
-                        sol = allGreedy(im, budget, alpha);
-                        end = std::chrono::steady_clock::now();
+                        if(!use_pagerank_scores){
+                            begin = std::chrono::steady_clock::now();
+                            sol = allGreedy(im, budget, alpha);
+                            end = std::chrono::steady_clock::now();
+                        }
+                        else{
+                            begin = std::chrono::steady_clock::now();
+                            sol = allGreedy(im2, budget, alpha);
+                            end = std::chrono::steady_clock::now();
+                            im->setRewards(sol.first);
+                            sol.second = findMinMaxScore(im, budget);
+                        }
                         diftime = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
                         //cout<<"AllGreedy | solution: ";printSolution(sol.first);
                         cout<<"AllGreedy | score: "<<sol.second<<endl; res[5] = sol.second;
@@ -123,10 +153,20 @@ void experiment1(string foldername, vector<int> Ns, vector<int> Ps, vector<int> 
                         write_new_line(foldername+"/allGreedy.txt", res);
                         cout<<"-----------------"<<endl;
                         
+
                         cout<<"-----------------"<<endl;
-                        begin = std::chrono::steady_clock::now();
-                        sol = single_lazyGreedy(im, budget, alpha);
-                        end = std::chrono::steady_clock::now();
+                        if(!use_pagerank_scores){
+                            begin = std::chrono::steady_clock::now();
+                            sol = single_lazyGreedy(im, budget, alpha);
+                            end = std::chrono::steady_clock::now();
+                        }
+                        else{
+                            begin = std::chrono::steady_clock::now();
+                            sol = single_lazyGreedy(im2, budget, alpha);
+                            end = std::chrono::steady_clock::now();
+                            im->setRewards(sol.first);
+                            sol.second = findMinMaxScore(im, budget);
+                        }
                         diftime = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
                         //cout<<"Myopic | solution: ";printSolution(sol.first);
                         cout<<"Myopic | score: "<<sol.second<<endl; res[5] = sol.second;
@@ -135,6 +175,53 @@ void experiment1(string foldername, vector<int> Ns, vector<int> Ps, vector<int> 
                         cout<<"Myopic | size: "<<sizeOfSolution(sol.first)<<endl; res[8] = sizeOfSolution(sol.first);
                         write_new_line(foldername+"/myopic.txt", res);
                         cout<<"-----------------"<<endl;   
+
+
+                        if(true){
+                        cout<<"-----------------"<<endl;
+                        if(!use_pagerank_scores){
+                            begin = std::chrono::steady_clock::now();
+                            sol = dynamic_programming(im, budget, alpha);
+                            end = std::chrono::steady_clock::now();
+                        }
+                        else{
+                            begin = std::chrono::steady_clock::now();
+                            sol = dynamic_programming(im2, budget, alpha);
+                            end = std::chrono::steady_clock::now();
+                            im->setRewards(sol.first);
+                            sol.second = findMinMaxScore(im, budget);
+                        }
+                        diftime = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
+                        //cout<<"Myopic | solution: ";printSolution(sol.first);
+                        cout<<"Dynamic | score: "<<sol.second<<endl; res[5] = sol.second;
+                        cout<<"Dynamic | cost: "<<im->mdp->findCost(&sol.first)<<endl; res[6] = budget;
+                        cout<<"Dynamic | time: "<<diftime<<" [msecs]"<<endl; res[7] = diftime; 
+                        cout<<"Dynamic | size: "<<sizeOfSolution(sol.first)<<endl; res[8] = sizeOfSolution(sol.first);
+                        write_new_line(foldername+"/dynamic.txt", res);
+                        cout<<"-----------------"<<endl; 
+                        }
+
+                        cout<<"-----------------"<<endl;
+                        if(!use_pagerank_scores){
+                            begin = std::chrono::steady_clock::now();
+                            sol = BWS(im, budget, alpha);
+                            end = std::chrono::steady_clock::now();
+                        }
+                        else{
+                            begin = std::chrono::steady_clock::now();
+                            sol = BWS(im2, budget, alpha);
+                            end = std::chrono::steady_clock::now();
+                            im->setRewards(sol.first);
+                            sol.second = findMinMaxScore(im, budget);
+                        }
+                        diftime = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
+                        //cout<<"Myopic | solution: ";printSolution(sol.first);
+                        cout<<"BWS | score: "<<sol.second<<endl; res[5] = sol.second;
+                        cout<<"BWS | cost: "<<im->mdp->findCost(&sol.first)<<endl; res[6] = budget;
+                        cout<<"BWS | time: "<<diftime<<" [msecs]"<<endl; res[7] = diftime; 
+                        cout<<"BWS | size: "<<sizeOfSolution(sol.first)<<endl; res[8] = sizeOfSolution(sol.first);
+                        write_new_line(foldername+"/bws.txt", res);
+                        cout<<"-----------------"<<endl;
                     }
                     delete im;
                 }
@@ -149,57 +236,57 @@ void experiment1(string foldername, vector<int> Ns, vector<int> Ps, vector<int> 
 }
 
 
-void N_experiments(string foldername, string read_folder, string name_end, bool use_IC, bool uniform_steps){
+void N_experiments(string foldername, string read_folder, string name_end, bool use_IC, bool uniform_steps, bool use_pagerank_scores){
     vector<int> Ns = {2500, 5000, 7500, 10000, 12500};
     vector<int> Ps = {10};
     vector<int> Steps = {6};
     vector<double> budgets = {0.25};
     vector<double> alphas = {1.0};
-    experiment1(foldername, Ns, Ps, Steps, budgets, alphas, use_IC, uniform_steps, read_folder, name_end, true);
+    experiment1(foldername, Ns, Ps, Steps, budgets, alphas, use_IC, uniform_steps, read_folder, name_end, true, use_pagerank_scores);
 }
 
 
-void pi_experiments(string foldername, string read_folder, string name_end, bool use_IC, bool uniform_steps){
+void pi_experiments(string foldername, string read_folder, string name_end, bool use_IC, bool uniform_steps, bool use_pagerank_scores){
     vector<int> Ns = {10000};
     vector<int> Ps = {1, 3, 5, 10, 15, 20};
     vector<int> Steps = {6};
     vector<double> budgets = {0.25};
     vector<double> alphas = {1.0};
-    experiment1(foldername, Ns, Ps, Steps, budgets, alphas, use_IC, uniform_steps, read_folder, name_end, true);
+    experiment1(foldername, Ns, Ps, Steps, budgets, alphas, use_IC, uniform_steps, read_folder, name_end, true, use_pagerank_scores);
 }
 
 
-void budget_experiments(string foldername, string read_folder, string name_end, bool use_IC, bool uniform_steps){
+void budget_experiments(string foldername, string read_folder, string name_end, bool use_IC, bool uniform_steps, bool use_pagerank_scores){
     vector<int> Ns = {10000};
     vector<int> Ps  {10};
     vector<int> Steps = {6};
     vector<double> budgets = {0.1, 0.25, 0.5, 0.75};
     vector<double> alphas = {1.0};
-    experiment1(foldername, Ns, Ps, Steps, budgets, alphas, use_IC, uniform_steps, read_folder, name_end, true);
+    experiment1(foldername, Ns, Ps, Steps, budgets, alphas, use_IC, uniform_steps, read_folder, name_end, true, use_pagerank_scores);
 }
 
 
-void steps_experiments(string foldername, string read_folder, string name_end, bool use_IC, bool uniform_steps){
+void steps_experiments(string foldername, string read_folder, string name_end, bool use_IC, bool uniform_steps, bool use_pagerank_scores){
     vector<int> Ns = {10000};
     vector<int> Ps =  {10};
     vector<int> Steps = {2, 4, 6, 8, 10};
     vector<double> budgets = {0.25};
     vector<double> alphas = {1.0};
-    experiment1(foldername, Ns, Ps, Steps, budgets, alphas, use_IC, uniform_steps, read_folder, name_end, true);
+    experiment1(foldername, Ns, Ps, Steps, budgets, alphas, use_IC, uniform_steps, read_folder, name_end, true, use_pagerank_scores);
 }
 
 
-void alphas_experiments(string foldername, string read_folder, string name_end, bool use_IC, bool uniform_steps){
+void alphas_experiments(string foldername, string read_folder, string name_end, bool use_IC, bool uniform_steps, bool use_pagerank_scores){
     vector<int> Ns = {10000};
     vector<int> Ps =  {10};
     vector<int> Steps = {6};
     vector<double> budgets = {0.25};
     vector<double> alphas = {1.0, 1.25, 1.5, 1.75, 2};
-    experiment1(foldername, Ns, Ps, Steps, budgets, alphas, use_IC, uniform_steps, read_folder, name_end, true);
+    experiment1(foldername, Ns, Ps, Steps, budgets, alphas, use_IC, uniform_steps, read_folder, name_end, true, use_pagerank_scores);
 }
 
 
-void avg_deg_experiments(string foldername, string read_folder, string name_end){
+void avg_deg_experiments(string foldername, string read_folder, string name_end, bool use_pagerank_scores){
     vector<int> Ns = {10000};
     vector<int> Ps =  {10};
     vector<int> Steps = {6};
@@ -215,12 +302,12 @@ void avg_deg_experiments(string foldername, string read_folder, string name_end)
         for(auto avg:{3,6,9,12})
             experiment1(foldername+"/"+to_string(avg), Ns, Ps, Steps, budgets, alphas, true, true, 
             read_folder+"/erdos_avg_"+to_string(avg)+"_id_"+to_string(iter), 
-            "_"+name_end+"_avg_"+to_string(avg)+"_id_"+to_string(iter), inres);
+            "_"+name_end+"_avg_"+to_string(avg)+"_id_"+to_string(iter), inres, use_pagerank_scores);
     }
 }
 
 
-void distr_experiments(string foldername, string read_folder, string name_end){
+void distr_experiments(string foldername, string read_folder, string name_end, bool use_pagerank_scores){
     vector<int> Ns = {10000};
     vector<int> Ps =  {10};
     vector<int> Steps = {6};
@@ -236,7 +323,7 @@ void distr_experiments(string foldername, string read_folder, string name_end){
         for(auto distr:{6,7,8,9})
             experiment1(foldername+"/"+to_string(distr), Ns, Ps, Steps, budgets, alphas, true, true, 
             read_folder+"/scale_beta_"+to_string(distr)+"_id_"+to_string(iter), 
-            "_"+name_end+"_beta_"+to_string(distr)+"_id_"+to_string(iter), inres);
+            "_"+name_end+"_beta_"+to_string(distr)+"_id_"+to_string(iter), inres, use_pagerank_scores);
     }
 }
 
@@ -244,12 +331,13 @@ void distr_experiments(string foldername, string read_folder, string name_end){
 
 int main()
 {
-    string save_foler ="./24_05_2023/";
+    string save_foler ="./30_06_2023/";
     string read_folder = "./Datasets";
     vector<string> parameters = {"N", "Pi", "Steps", "Budget", "Alpha"};
     vector<string> graphnames = {"erdos", "scale"};
     vector<bool> use_ICs = {true};
     vector<bool> uniform_steps = {true};
+    vector<bool> use_pagerank_scores = {false};
 
     for(int id=0; id<10; id++){
         for(auto parameter: parameters){
@@ -258,32 +346,37 @@ int main()
                 if(graphname == "scale") graphname += "_beta_8_id_"+to_string(id);
                 for(auto use_IC: use_ICs){
                     for(auto uniform_step: uniform_steps){
-                        string foldername =  save_foler+graphname;
-                        foldername+="/"+parameter;
-                        string name_end = "_"+graphname;
-                        //N
-                        if(parameter == "N") N_experiments(foldername, read_folder+"/"+graphname, name_end, use_IC, uniform_step);
-                        //Pi
-                        if(parameter == "Pi") pi_experiments(foldername, read_folder+"/"+graphname, name_end, use_IC, uniform_step);
-                        //Steps
-                        if(parameter == "Steps") steps_experiments(foldername, read_folder+"/"+graphname, name_end, use_IC, uniform_step);
-                        //Budget
-                        if(parameter == "Budget") budget_experiments(foldername, read_folder+"/"+graphname, name_end, use_IC, uniform_step);
-                        //Alpha
-                        if(parameter == "Alpha") alphas_experiments(foldername, read_folder+"/"+graphname, name_end, use_IC, uniform_step);
+                        for(auto pagerank: use_pagerank_scores){
+                            string foldername =  save_foler+graphname;
+                            if(pagerank){
+                                foldername =  save_foler+graphname+"_pagerank";
+                            }
+                            foldername+="/"+parameter;
+                            string name_end = "_"+graphname;
+                            //N
+                            if(parameter == "N") N_experiments(foldername, read_folder+"/"+graphname, name_end, use_IC, uniform_step, pagerank);
+                            //Pi
+                            if(parameter == "Pi") pi_experiments(foldername, read_folder+"/"+graphname, name_end, use_IC, uniform_step, pagerank);
+                            //Steps
+                            if(parameter == "Steps") steps_experiments(foldername, read_folder+"/"+graphname, name_end, use_IC, uniform_step, pagerank);
+                            //Budget
+                            if(parameter == "Budget") budget_experiments(foldername, read_folder+"/"+graphname, name_end, use_IC, uniform_step, pagerank);
+                            //Alpha
+                            if(parameter == "Alpha") alphas_experiments(foldername, read_folder+"/"+graphname, name_end, use_IC, uniform_step, pagerank);
+                        }
                     }
                 }
             }
         }
     }
+    for(auto pagerank: use_pagerank_scores){
+        //Avg - Scale
+        string graphname = "scale";
+        distr_experiments(save_foler+graphname+"/distr", read_folder, graphname, pagerank);
 
-    //Avg - Scale
-    string graphname = "scale";
-    distr_experiments(save_foler+graphname+"/distr", read_folder, graphname);
-
-    //Beta - Erdos
-    graphname = "erdos";
-    avg_deg_experiments(save_foler+graphname+"/avg", read_folder, graphname);
-
+        //Beta - Erdos
+        graphname = "erdos";
+        avg_deg_experiments(save_foler+graphname+"/avg", read_folder, graphname, pagerank);
+    }
     return 0;
 }

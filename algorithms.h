@@ -190,7 +190,10 @@ double findMinMaxScore(IM *im, int budget){
     }
     double minMaxScore = std::numeric_limits<double>::max();
     for(int i=0; i<im->mdp->P; i++){
-        if((scores[i]/best_scores[i]) < minMaxScore) minMaxScore = (scores[i]/best_scores[i]);
+        if((scores[i]/best_scores[i]) < minMaxScore){
+            //cout<<scores[i]<<endl;
+            minMaxScore = (scores[i]/best_scores[i]);
+        }
     }
     *(im->mdp->Reward) = rewards;
     return minMaxScore;
@@ -620,12 +623,18 @@ int lazyGPC(IM *im, double c, vector<double>* optimal_scores, vector<double>* no
 //@param[in] alpha: parameter alpha for the bicriteria approximation
 //@return pair<vector<int>, double> pair of solution with the influence score
 pair<vector<int>, double> Saturate(IM *im, int budget, double alpha){
+    //cout<<"re"<<endl;
     im->emptyRewardStates();
+    //cout<<"Out"<<endl;
     vector<double>* optimal_scores = new vector<double>();
     vector<double>* non_optimal_scores = new vector<double>();
     for(int i=0; i<im->mdp->P; i++){
+        //cout<<"In"<<endl;
         optimal_scores->push_back(findOptimal(im, budget, i, false).second);
+        //cout<<"Out"<<endl;
+        //cout<<"In"<<endl;
         non_optimal_scores->push_back(findNonOptimal(im, budget, i, false).second);
+        //cout<<"Out"<<endl;
     }
     double cmin = 0;
     int current_cost = 0;
@@ -705,10 +714,74 @@ pair<vector<int>, double> Saturate(IM *im, int budget, double alpha){
             }
         }
         //-----------------------------------------------------------------------------------
-    
     double minMaxScore = findMinMaxScore(im, budget);
     optimal_scores->clear(); delete optimal_scores;
     non_optimal_scores->clear(); delete non_optimal_scores;
     //cout<<"*****************************-------------------------> "<<current_cost<<endl;
+    return make_pair(*(im->mdp->Reward), minMaxScore);
+}
+
+
+
+
+
+//Dynamic Programming Algorithm implementation
+//@param[in] im: IM 
+//@param[in] budget: budget constraint
+//@param[in] alpha: parameter alpha for the bicriteria approximation
+//@return pair<vector<int>, double> pair of solution with the influence score
+pair<vector<int>, double> dynamic_programming(IM *im, int budget, double alpha){
+    im->emptyRewardStates();
+    pair<vector<int>, double> res = MinMaxknapSack(im, int(alpha*budget));
+    //im->emptyRewardStates();
+    //pair<vector<int>, double> res2 = knapSack(im, budget,0,true,false);
+    im->emptyRewardStates();
+    im->setRewards(res.first);
+    double minMaxScore = findMinMaxScore(im, budget);
+    cout<<"Dynamic Programming Greedy: "<<minMaxScore<<" ===== "<<res.second<<endl;//<<"----"<<res2.second<<endl;
+    return make_pair(*(im->mdp->Reward), minMaxScore);
+}
+
+
+
+//Best Worst Search Algorithm implementation
+//@param[in] im: IM 
+//@param[in] budget: budget constraint
+//@param[in] alpha: parameter alpha for the bicriteria approximation
+//@return pair<vector<int>, double> pair of solution with the influence score
+pair<vector<int>, double> BWS(IM *im, int budget, double alpha){
+    im->emptyRewardStates();
+    priority_queue<pair<double, int> > *pq;
+    pq = new priority_queue<pair<double, int> >();
+    vector<int> res;
+    for(int s=0; s<im->mdp->N; s++){
+        res.push_back(0);
+        int cost_s = im->mdp->findCost(s);
+        float score_s = 1000000;
+        for(int i=0; i<im->mdp->P; i++){
+            im->setReward(s, 1);
+            float score_s_i = im->F(i);
+            im->setReward(s, 0);
+            if(score_s_i<score_s) score_s = score_s_i;
+        }
+        pq->push(make_pair(score_s/cost_s, s));
+    }
+    int total_cost = 0;
+    double total_score_is = 0.0;
+    while(!pq->empty()){
+        pair<double, int> top_s_pair = pq->top(); pq->pop();
+        int top_s = top_s_pair.second;
+        int cost_top_s = im->mdp->findCost(top_s);
+        if((total_cost + cost_top_s)>alpha*budget) continue;
+        res.at(top_s)=1;
+        total_cost += cost_top_s;
+        total_score_is += top_s_pair.first * cost_top_s;
+    }
+    cout<<"total cost is "<<total_cost<<endl;
+    *pq = priority_queue<pair<double, int> >(); delete pq;
+    //im->emptyRewardStates();
+    im->setRewards(res);
+    double minMaxScore = findMinMaxScore(im, budget);
+    cout<<"BWS: "<<minMaxScore<<endl;
     return make_pair(*(im->mdp->Reward), minMaxScore);
 }

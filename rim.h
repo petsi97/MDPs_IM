@@ -39,6 +39,8 @@ class IM{
         return new vector<double>();
     }
 
+    virtual void set_scores(string filename){}
+
     virtual double all_scores(int policy){
         return 0.0;
     }
@@ -47,7 +49,9 @@ class IM{
 
     virtual void setReward(int reward_state, int reward){this->mdp->setRewardState(reward_state, reward);}
 
-    virtual void setRewards(vector<int>& rewards){*(this->mdp->Reward) = rewards;}
+    virtual void setRewards(vector<int>& rewards){
+        *(this->mdp->Reward) = rewards;
+    }
 
     virtual void emptyRewardStates(){this->mdp->emptyRewardStates();}
 
@@ -70,11 +74,13 @@ class IM_IC : public IM {
     public:
         vector<double>* scores;
         vector<double> current_score;
+        //vector<double>* pagerank_scores;
 
         //Empty Constructor
         IM_IC(){
             this->mdp = new MDP();
             scores = new vector<double>();
+            //pagerank_scores = new vector<double>();
         }
 
         //Constructor that uses the given MDP
@@ -86,6 +92,23 @@ class IM_IC : public IM {
             //this->find_scores();
             this->find_scores_multithreading();
         }
+        
+        //Constructor that uses the given MDP and reads scores from filename
+        //@param model: an MDP
+        //@param filaname: name of txt file with the pagerank scores
+        IM_IC(MDP* model, vector<string>* filenames){
+            this->mdp = model;
+            scores = new vector<double>[this->mdp->P];
+            cout<<"Importing pagerank scores from files..."<<endl;
+            //this->find_scores();
+            //this->find_scores_multithreading();
+            int counter = 0;
+            for(auto filename: *filenames){
+                this->set_scores(filename, counter);
+                this->current_score.push_back(0);
+                counter++;
+            }
+        }
 
         //Returns the saved scores 
         //@return model: vector<double>* dynamic array (for each policy) of 
@@ -93,6 +116,29 @@ class IM_IC : public IM {
         vector<double>* score(){
             return this->scores;
         }
+
+
+
+        //Read and set new scores from filename per state for a given policy 
+        //@param filename: name of txt file to read the new scores 
+        //@param policy: policy to change its scores
+        void set_scores(string filename, int policy){
+            string line;
+            ifstream input(filename);
+            //getline(input, line);
+            if(this->score()->size()>0){
+                this->scores[policy].empty();
+                //this->pagerank_scores[policy].empty();
+            }
+            //else scores = new vector<double>[this->mdp->P];
+            for (string line; getline(input, line);) {
+                //Double per line
+                double a = stod(line);
+                this->scores[policy].push_back(a);
+                //this->pagerank_scores[policy].push_back(a);
+            }
+        }
+
 
         //Calculating the scores
         void find_scores(){

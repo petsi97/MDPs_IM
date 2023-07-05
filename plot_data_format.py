@@ -6,11 +6,11 @@ import os
 from os import path
 
 def make_csv():
-    folder_name = ['24_05_2023']  
-    dataset_type = ['erdos']
+    folder_name = ['30_06_2023'] 
+    dataset_type = ['erdos', 'scale']
     iters = [str(i) for i in range(10)]
     parameters = ['Alpha', 'Budget', 'N', 'Pi', 'Steps']
-    algorithms = ['allGreedy', 'myopic', 'saturate']
+    algorithms = ['allGreedy', 'myopic', 'saturate', 'bws', 'dynamic']
     
     for name in folder_name:
         for datatype in dataset_type:
@@ -36,12 +36,12 @@ def make_csv():
                         f.write(dfall.to_string(header=True, index=False))
 
 def make_csv_distribution_plots():
-    folder_name = ['24_05_2023']  
+    folder_name = ['30_06_2023'] 
+    algorithms = ['allGreedy', 'myopic', 'saturate', 'bws', 'dynamic']
+    
     dataset_type = ['erdos']
     avgs = ['3', '6', '9', '12']
     parameters = ['avg']
-    algorithms = ['allGreedy', 'myopic', 'saturate']
-    
     for name in folder_name:
         for datatype in dataset_type:
             for param in parameters:
