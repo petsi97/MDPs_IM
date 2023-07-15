@@ -23,9 +23,9 @@ double max(double a, double b) { return (a > b) ? a : b; }
   | else if ret_sol is False then the algorithm has space complexity O(2 * budget)
 * @return pair<vector<int, double> that includes the solution and its knapsack score 
 */  
-pair<vector<int>, double> knapSack(IM *im, int budget, int policy, bool ret_sol, bool rev_res)
+void knapSack(IM *im, int budget, int policy, bool ret_sol, bool rev_res, pair<vector<int>, double>* solution)
 {
-    pair<vector<int>, double> solution;
+    //pair<vector<int>, double> solution;
     int n = im->mdp->N;
     if(ret_sol){
         float **K;
@@ -47,18 +47,18 @@ pair<vector<int>, double> knapSack(IM *im, int budget, int policy, bool ret_sol,
                 }
             }
         }
-        if(rev_res) solution.second = im->all_scores(policy) - K[n][budget];
-        else solution.second = K[n][budget];
+        if(rev_res) solution->second = im->all_scores(policy) - K[n][budget];
+        else solution->second = K[n][budget];
         int w = budget;
         for(int i=n; i>=1; i--){
             if(K[i][w] != K[i-1][w]){
-                if(rev_res) solution.first.push_back(0);
-                else solution.first.push_back(1);
+                if(rev_res) solution->first.push_back(0);
+                else solution->first.push_back(1);
                 w -= im->mdp->findCost(i-1);
             }
             else{
-                if(rev_res) solution.first.push_back(1);
-                else solution.first.push_back(0);
+                if(rev_res) solution->first.push_back(1);
+                else solution->first.push_back(0);
             }
         }
         for (int i=0; i<n+1; i++){
@@ -83,12 +83,12 @@ pair<vector<int>, double> knapSack(IM *im, int budget, int policy, bool ret_sol,
                 }
             }
         }
-        if(rev_res) solution.second = im->all_scores(policy) - K[n%2][budget];
-        else solution.second = K[n%2][budget];
+        if(rev_res) solution->second = im->all_scores(policy) - K[n%2][budget];
+        else solution->second = K[n%2][budget];
         
     }
-    reverse(solution.first.begin(),solution.first.end());
-    return solution;
+    reverse(solution->first.begin(),solution->first.end());
+    //return solution;
 }
  
 

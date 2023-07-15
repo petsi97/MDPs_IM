@@ -135,12 +135,13 @@ pair<vector<int>, double> lazyGreedy(IM *im, int budget, int policy){
 //@param[in] policy: policy
 //@param[in] ret_sol: boolean variable that determines if we return the solution or not
 //@return pair<vector<int>, double> pair of solution with the influence score
-pair<vector<int>, double> findOptimal(IM *im, int budget, int policy, bool ret_sol){
+void findOptimal(IM *im, int budget, int policy, bool ret_sol, pair<vector<int>, double>* opt_rew_sc){
     //-----------------------------------------------------------------------------------
     if(im->score()->size()>0){
-        return knapSack(im, budget, policy, ret_sol, false);
+        return knapSack(im, budget, policy, ret_sol, false, opt_rew_sc);
     }
-    return lazyGreedy(im, budget, policy);
+    *opt_rew_sc = lazyGreedy(im, budget, policy);
+    return;
     //-----------------------------------------------------------------------------------
 }
 
@@ -158,7 +159,8 @@ pair<vector<int>, double> findNonOptimal(IM *im, int budget, int policy, bool re
     ret.second = 0;
     return ret; //comment to use it
     if(im->score()->size()>0){
-        return knapSack(im, im->mdp->total_budget - budget, policy, ret_sol, true);
+        knapSack(im, im->mdp->total_budget - budget, policy, ret_sol, true, &ret);
+        return ret;
     }
     pair<vector<int>, double> to_ret = lazyGreedy(im, im->mdp->total_budget - budget, policy);
     to_ret.second = lazyGreedy(im, im->mdp->total_budget, policy).second - to_ret.second;
@@ -185,7 +187,8 @@ double findMinMaxScore(IM *im, int budget){
     for(int i=0; i<im->mdp->P; i++){
         pair<vector<int>, double> non_state_score = findNonOptimal(im, budget, i, false);
         scores.push_back(im->F(i)-non_state_score.second);
-        pair<vector<int>, double> state_score = findOptimal(im, budget, i, false);
+        pair<vector<int>, double> state_score;
+        findOptimal(im, budget, i, false, &state_score);
         best_scores.push_back(state_score.second - non_state_score.second);
     }
     double minMaxScore = std::numeric_limits<double>::max();
@@ -236,9 +239,11 @@ pair<vector<int>, double> randomSelection(IM *im, int budget, double alpha){
 //@return pair<vector<int>, double> pair of solution with the influence score
 pair<vector<int>, double> allGreedy(IM *im, int budget, double alpha){
     vector<pair<vector<int>, double>> optimal_rewards_with_scores;
+    im->emptyRewardStates();
     vector<double> non_optimal_scores;
     for(int i=0; i<im->mdp->P; i++){  
-        optimal_rewards_with_scores.push_back(findOptimal(im, budget, i, true));
+        optimal_rewards_with_scores.push_back(pair<vector<int>, double>());
+        findOptimal(im, budget, i, true, &(optimal_rewards_with_scores.at(i)));
         //cout<<"COST -----****----> "<<im->mdp->findCost(&(optimal_rewards_with_scores.at(optimal_rewards_with_scores.size()-1).first))<<" - "<<budget<<endl;
         non_optimal_scores.push_back(findNonOptimal(im, budget, i, false).second);
     }
@@ -248,7 +253,8 @@ pair<vector<int>, double> allGreedy(IM *im, int budget, double alpha){
     }
     else{
         for(int i=0; i<im->mdp->P; i++){  
-            alpha_optimal_rewards_with_scores.push_back(findOptimal(im, alpha*budget, i, true));
+            alpha_optimal_rewards_with_scores.push_back(pair<vector<int>, double>());
+            findOptimal(im, alpha*budget, i, true, &(alpha_optimal_rewards_with_scores.at(i)));
         }
     }
     im->emptyRewardStates();
@@ -287,7 +293,9 @@ pair<vector<int>, double> singleGreedy(IM *im, int budget, double alpha){
     vector<double> non_optimal_scores;
     vector<double> prev_f;
     for(int i=0; i<im->mdp->P; i++){  
-        optimal_scores.push_back(findOptimal(im, budget, i, false).second);
+        pair<vector<int>, double> temp;
+        findOptimal(im, budget, i, false, &temp);
+        optimal_scores.push_back(temp.second);
         non_optimal_scores.push_back(findNonOptimal(im, budget, i, false).second);
         prev_f.push_back(0);
         //cout<<"OPTIMAL: "<<optimal_rewards_with_scores[i].second<<endl;
@@ -441,7 +449,9 @@ pair<vector<int>, double> single_lazyGreedy(IM *im, int budget, double alpha){
     double best_score = 0.0;
     //-----------------------------------------------------------------------------------
     for(int i=0; i<im->mdp->P; i++){  
-        optimal_scores.push_back(findOptimal(im, budget, i, false).second);
+        pair<vector<int>, double> temp;
+        findOptimal(im, budget, i, false, &temp);
+        optimal_scores.push_back(temp.second);
         non_optimal_scores.push_back(findNonOptimal(im, budget, i, false).second);
         pqs.push_back(new priority_queue<pair<double, int> >());
     }
@@ -630,7 +640,9 @@ pair<vector<int>, double> Saturate(IM *im, int budget, double alpha){
     vector<double>* non_optimal_scores = new vector<double>();
     for(int i=0; i<im->mdp->P; i++){
         //cout<<"In"<<endl;
-        optimal_scores->push_back(findOptimal(im, budget, i, false).second);
+        pair<vector<int>, double> temp;
+        findOptimal(im, budget, i, false, &temp);
+        optimal_scores->push_back(temp.second);
         //cout<<"Out"<<endl;
         //cout<<"In"<<endl;
         non_optimal_scores->push_back(findNonOptimal(im, budget, i, false).second);
@@ -668,7 +680,9 @@ pair<vector<int>, double> Saturate(IM *im, int budget, double alpha){
         }
         //-----------------------------------------------------------------------------------
         for(int i=0; i<im->mdp->P; i++){  
-            optimal_scores->push_back(findOptimal(im, budget, i, false).second);
+            pair<vector<int>, double> temp;
+            findOptimal(im, budget, i, false, &temp);
+            optimal_scores->push_back(temp.second);
             non_optimal_scores->push_back(findNonOptimal(im, budget, i, false).second);
             pqs.push_back(new priority_queue<pair<double, int> >());
         }
